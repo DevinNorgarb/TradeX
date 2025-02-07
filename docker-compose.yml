@@ -1,6 +1,33 @@
 version: "3.8"
 
 services:
+  cloudflared:
+    image: cloudflare/cloudflared
+    container_name: cloudflare-tunnel
+    restart: unless-stopped
+    environment:
+      - TUNNEL_TOKEN=${TUNNEL_TOKEN:-}  # Ensure token is either empty or set
+    command: >
+      /bin/bash -c "
+      if [ -n \"${TUNNEL_TOKEN}\" ]; then
+       echo \"Tunnel token is set\";
+      else
+         tunnel --url http://nginx:80;
+               echo \"Tunnel token is not set\"               
+               fi"
+    depends_on:
+      - nginx
+
+  nginx:
+    image: nginx
+    container_name: nginx
+    restart: unless-stopped
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf  # Assuming you have a custom nginx.conf
+      - ./webhook:/var/www/webhook  # Assuming your webhook application is here
+    environment:
+      - NGINX_HOST=nginx
+
   tradex_app:
     build: .
     container_name: tradex_container
@@ -10,8 +37,4 @@ services:
     ports:
       - "5000:5000"  # Dashboard
       - "5005:5005"  # Webhook
-    #volumes:
-      #- .:/app
-      #- ./logs:/var/log
-      #- ./logs:/app/logs
     command: /usr/bin/supervisord -c /etc/supervisor/conf.d/supervisord.conf
